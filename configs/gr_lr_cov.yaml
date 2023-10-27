@@ -1,0 +1,26 @@
+dataset:
+  poi: "genres"
+  covariates: ["budget", "runtime"]
+  strategy: "genre_similarity"
+  strategy_kwargs:
+    threshold: 0.8
+  dataloader_kwargs:
+    batch_size: 2048
+    num_workers: 0
+
+model:
+  type: "graph_regularized_linear_regression"
+  model_kwargs:
+    alpha: 0.01
+
+train:
+  lr: 0.002
+  monte_carlo_size: 64
+  split_kwargs:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+  trainer_kwargs:
+    max_epochs: 200
+    check_val_every_n_epoch: 2
+    log_every_n_steps: 1

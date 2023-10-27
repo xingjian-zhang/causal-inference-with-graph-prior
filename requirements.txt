@@ -1,0 +1,9 @@
+lightning
+matplotlib
+numpy
+pandas
+PyYAML
+scikit_learn
+seaborn
+tensorboard
+torch
