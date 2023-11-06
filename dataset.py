@@ -187,7 +187,9 @@ def _split_arrays(
     test_indices = indices[n_train + n_val:]
 
     # Split the arrays using the indices
-    get_array = lambda indices: tuple(array[indices] if array is not None else None for array in arrays)
+    get_array = lambda indices: tuple(array[indices]
+                                      if array is not None else None
+                                      for array in arrays)
     train_arrays = get_array(train_indices)
     val_arrays = get_array(val_indices)
     test_arrays = get_array(test_indices)

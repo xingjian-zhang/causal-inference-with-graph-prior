@@ -8,13 +8,8 @@ dataset:
     batch_size: 2048
     num_workers: 0
 
-model:
-  type: "linear_regression"
-  model_kwargs:
-    bias: True
-
 train:
-  lr: 0.001
+  lr: 0.002
   monte_carlo_size: 64
   split_kwargs:
     train_ratio: 0.7

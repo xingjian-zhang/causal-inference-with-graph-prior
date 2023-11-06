@@ -1,17 +1,12 @@
 dataset:
   poi: "genres"
-  covariates: ["budget", "runtime"]
+  covariates: []
   strategy: "genre_similarity"
   strategy_kwargs:
     threshold: 0.8
   dataloader_kwargs:
     batch_size: 2048
     num_workers: 0
-
-model:
-  type: "graph_regularized_linear_regression"
-  model_kwargs:
-    alpha: 0.01
 
 train:
   lr: 0.002

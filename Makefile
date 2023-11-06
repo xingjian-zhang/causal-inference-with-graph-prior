@@ -1,7 +1,7 @@
 PYTHON := /Users/jimmy/miniforge3/envs/gli/bin/python
 CONFIG_DIR := configs
 
-.PHONY: lr mlp lr_cov mlp_cov gr_lr gr_lr_cov collect-results
+.PHONY: lr gr_lr collect-results
 
 clean:
 	rm -rf lightning_logs
@@ -15,10 +15,11 @@ clean-all:
 	rm -rf lightning_logs
 	rm -rf tb_logs
 
-lr mlp lr_cov mlp_cov gr_lr gr_lr_cov:
-	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml --random_seed $(RANDOM_SEED)
+lr gr_lr:
+	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/no_ctrl.yaml --random_seed $(RANDOM_SEED)
+	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/cov_ctrl.yaml --random_seed $(RANDOM_SEED)
 
-all: lr mlp lr_cov mlp_cov gr_lr gr_lr_cov
+all: lr gr_lr
 
 results:
 	mkdir -p results
