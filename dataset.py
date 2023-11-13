@@ -25,22 +25,23 @@ class ObservationalDataWithGPrior:
     poi: np.ndarray
     graph_prior: np.ndarray
 
+
 def synthetic_data_generation(
-    orignal_filename: str = "data/clean_data.json",
-    output_filename: str = "data/synthetic_data.json",
-    num_cast=900,
-    threshold_large_half=0.05,
-    threshold_small_half=0.01,
-    target_movie_set={5,6,10},
-    noise_sigma=1,
-    counterfactual=False,
-    b=None,
-    g=None,
-    C=None
-):
-    assert (counterfactual is not False and b is not None and g is not None and C is not None) or (counterfactual is False)
+        orignal_filename: str = "data/clean_data.json",
+        output_filename: str = "data/synthetic_data.json",
+        num_cast=900,
+        threshold_large_half=0.05,
+        threshold_small_half=0.01,
+        target_movie_set={5, 6, 10},
+        noise_sigma=1,
+        counterfactual=False,
+        b=None,
+        g=None,
+        C=None):
+    assert (counterfactual is not False and b is not None and g is not None
+            and C is not None) or (counterfactual is False)
     np.random.seed(42)
-    df=pd.read_json(orignal_filename)
+    df = pd.read_json(orignal_filename)
     G = df['genres'].apply(lambda x: int(bool(set(x) & target_movie_set)))
     G_one_hot = pd.get_dummies(G, prefix='G').values
 
@@ -54,15 +55,27 @@ def synthetic_data_generation(
     A = []
     for g_val in G:
         if g_val == (1 if not counterfactual else 0):
-            first_half = np.random.choice([0, 1], size=num_cast//2, p=[1-threshold_large_half, threshold_large_half])
-            second_half = np.random.choice([0, 1], size=num_cast//2, p=[1-threshold_small_half, threshold_small_half])
+            first_half = np.random.choice(
+                [0, 1],
+                size=num_cast // 2,
+                p=[1 - threshold_large_half, threshold_large_half])
+            second_half = np.random.choice(
+                [0, 1],
+                size=num_cast // 2,
+                p=[1 - threshold_small_half, threshold_small_half])
         else:
-            first_half = np.random.choice([0, 1], size=num_cast//2, p=[1-threshold_small_half, threshold_small_half])
-            second_half = np.random.choice([0, 1], size=num_cast//2, p=[1-threshold_large_half, threshold_large_half])
+            first_half = np.random.choice(
+                [0, 1],
+                size=num_cast // 2,
+                p=[1 - threshold_small_half, threshold_small_half])
+            second_half = np.random.choice(
+                [0, 1],
+                size=num_cast // 2,
+                p=[1 - threshold_large_half, threshold_large_half])
         A.append(list(first_half) + list(second_half))
 
-    Y = np.dot(A, b) + np.dot(G_one_hot,g) + C 
-    Y = Y + np.random.normal(loc=0, scale=noise_sigma,size=(len(Y),1))
+    Y = np.dot(A, b) + np.dot(G_one_hot, g) + C
+    Y = Y + np.random.normal(loc=0, scale=noise_sigma, size=(len(Y), 1))
 
     new_data = pd.DataFrame({
         'A': A,
@@ -70,10 +83,12 @@ def synthetic_data_generation(
         'Y': Y.flatten()
     })
     syn_data = df.drop(columns=['revenue', 'cast', 'genres'])
-    syn_data['cast'] = new_data['A'].apply(lambda x: [i for i, val in enumerate(x) if val == 1])
-    syn_data['genres'] = new_data['G'].apply(lambda x: [i for i, val in enumerate(x) if val == 1])
-    syn_data['revenue'] =new_data['Y']
-    
+    syn_data['cast'] = new_data['A'].apply(
+        lambda x: [i for i, val in enumerate(x) if val == 1])
+    syn_data['genres'] = new_data['G'].apply(
+        lambda x: [i for i, val in enumerate(x) if val == 1])
+    syn_data['revenue'] = new_data['Y']
+
     # save data
     syn_data.to_json(output_filename)
     np.savetxt("data/b_coefficient.dat", b)
@@ -81,6 +96,7 @@ def synthetic_data_generation(
     np.savetxt("data/c_coefficient.dat", C)
 
     return syn_data, (b, g, C)
+
 
 def get_synthetic_dataset_with_gprior(
     filename: str = "data/synthetic_data.json",
@@ -92,15 +108,20 @@ def get_synthetic_dataset_with_gprior(
     g=None,
     C=None,
     **kwargs,
-) ->ObservationalDataWithGPrior:
-    
-    df, (b, g, C) = synthetic_data_generation(output_filename=filename,counterfactual=counterfactual,b=b,g=g,C=C)
+) -> ObservationalDataWithGPrior:
+
+    df, (b, g, C) = synthetic_data_generation(output_filename=filename,
+                                              counterfactual=counterfactual,
+                                              b=b,
+                                              g=g,
+                                              C=C)
     n_cast = df["cast"].apply(max).max() + 1
-    
+
     def index_to_one_hot(index: list):
         vec = np.zeros(n_cast, dtype=int)
         vec[index] = 1
         return vec
+
     df["X"] = df["cast"].apply(index_to_one_hot)
     x = np.stack(df["X"].values)
     y = df["revenue"].values
@@ -108,12 +129,12 @@ def get_synthetic_dataset_with_gprior(
     z = _standardize(z)
 
     if poi == "genres":
-        poi = df['genres'].apply(lambda x: x[0]==0)
+        poi = df['genres'].apply(lambda x: x[0] == 0)
         poi = poi.values
     else:
         raise NotImplementedError(f"POI {poi} not implemented.")
-    
-    kwargs['b']=b
+
+    kwargs['b'] = b
     graph_prior = get_graph_prior(df, strategy, **kwargs)
     x, y, z = _to_dtype(x, y, z, dtype=np.float32)
 
@@ -184,7 +205,10 @@ def get_graph_prior(
     Returns:
         The graph prior adjacent matrix.
     """
-    func_dict = {"genre_similarity": _get_genre_similarity_prior, "gaussian_kernel": _get_gaussian_kernel_prior}
+    func_dict = {
+        "genre_similarity": _get_genre_similarity_prior,
+        "gaussian_kernel": _get_gaussian_kernel_prior
+    }
     if strategy not in func_dict:
         raise NotImplementedError(f"Strategy {strategy} not implemented.")
     prior_graph = func_dict[strategy](df, **kwargs)
@@ -290,20 +314,21 @@ def _split_arrays(
 
     return train_arrays, val_arrays, test_arrays
 
+
 def _get_gaussian_kernel_prior(
     df: pd.DataFrame,
     threshold: float = 0.8,
     binary: bool = True,
     **kwargs,
-): 
+):
     b = kwargs.get('b')
     n_cast = df["cast"].apply(max).max() + 1
     assert len(b) == n_cast
-    actor_similarity_matrix = np.zeros((n_cast,n_cast),dtype=float)
+    actor_similarity_matrix = np.zeros((n_cast, n_cast), dtype=float)
     bi = np.tile(b, (n_cast, 1))
     bj = bi.T
-    actor_similarity_matrix = np.exp(-((bi - bj) ** 2)) # sigma = 1
-    
+    actor_similarity_matrix = np.exp(-((bi - bj)**2))  # sigma = 1
+
     # when memory not enough:
     # Define the Gaussian kernel function
     # def gaussian_kernel(u, v, sigma=1):
@@ -317,6 +342,7 @@ def _get_gaussian_kernel_prior(
     else:
         return np.where(actor_similarity_matrix > threshold,
                         actor_similarity_matrix, 0)
+
 
 def _get_genre_similarity_prior(
     df: pd.DataFrame,
