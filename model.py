@@ -127,6 +127,13 @@ def model_factory(input_dim: int,
         )
     elif model_type == "linear_regression":
         return nn.Linear(input_dim, 1, **kwargs)
+    elif model_type == "graph_regularized_linear_regression":
+        return GraphRegularizedLinearModel(graph_prior, input_dim, **kwargs)
+    elif model_type == "simple_graph_convolution":
+        return nn.Sequential(
+            GraphSmoothLayer(graph_prior, **kwargs),
+            nn.Linear(input_dim, 1),
+        )
     elif model_type == "graph_smooth_mlp":
         hidden_dim = kwargs.pop("hidden_dim", 32)
         return nn.Sequential(
@@ -142,13 +149,12 @@ def model_factory(input_dim: int,
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
-    elif model_type == "graph_regularized_linear_regression":
-        return GraphRegularizedLinearModel(graph_prior, input_dim, **kwargs)
 
 
 class GraphSmoothLayer(nn.Module):
 
     def __init__(self, adj_matrix, n_steps=1, lazy_rate=0.):
+        super().__init__()
         if not isinstance(adj_matrix, torch.Tensor):
             adj_matrix = torch.from_numpy(adj_matrix)
         adj_matrix.fill_diagonal_(1)
@@ -167,9 +173,11 @@ class GraphSmoothLayer(nn.Module):
         return torch.matrix_power(diffusion_matrix, self.n_steps)
 
     def forward(self, h):
+        if self.diffusion_matrix.device != h.device:
+            self.diffusion_matrix = self.diffusion_matrix.to(h.device)
         x = h[..., :self.adj_matrix.shape[0]]
         z = h[..., self.adj_matrix.shape[0]:]
-        x = torch.mm(self.diffusion_matrix, x)
+        x = torch.mm(x, self.diffusion_matrix)
         return torch.cat((x, z), dim=-1)
 
 
@@ -177,6 +185,7 @@ def _compute_normalized_laplacian(adj_matrix):
     degree_matrix = torch.diag(torch.sum(adj_matrix, dim=1))
     degree_sqrt_inv = torch.diag(torch.pow(torch.sum(adj_matrix, dim=1), -0.5))
     laplacian = degree_matrix - adj_matrix
+    laplacian = laplacian.to(degree_sqrt_inv.dtype)
     normalized_laplacian = torch.mm(torch.mm(degree_sqrt_inv, laplacian),
                                     degree_sqrt_inv)
     return normalized_laplacian

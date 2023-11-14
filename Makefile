@@ -1,7 +1,7 @@
 PYTHON := /Users/jimmy/miniforge3/envs/gli/bin/python
 CONFIG_DIR := configs
 
-.PHONY: lr gr_lr collect-results
+.PHONY: lr gr_lr sgc collect-results
 
 clean:
 	rm -rf lightning_logs
@@ -15,11 +15,11 @@ clean-all:
 	rm -rf lightning_logs
 	rm -rf tb_logs
 
-lr gr_lr:
+lr gr_lr sgc:
 	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/no_ctrl.yaml --random_seed $(RANDOM_SEED)
 	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/cov_ctrl.yaml --random_seed $(RANDOM_SEED)
 
-all: lr gr_lr
+all: lr gr_lr sgc
 
 results:
 	mkdir -p results
@@ -29,3 +29,6 @@ collect-results: results
 
 install:
 	pip install -r requirements.txt
+
+tensorboard:
+	tensorboard --logdir tb_logs
