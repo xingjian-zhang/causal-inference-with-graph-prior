@@ -1,3 +1,4 @@
+from typing import Dict, Union
 import lightning.pytorch as pl
 import torch
 import torch.nn as nn
@@ -7,11 +8,14 @@ import numpy as np
 
 class PlugInEstimator(pl.LightningModule):
 
-    def __init__(self,
-                 model: nn.Module,
-                 covariate_samples: np.ndarray,
-                 lr: float = 0.1,
-                 monte_carlo_size: float = 32) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        covariate_samples: np.ndarray,
+        lr: float = 0.1,
+        monte_carlo_size: float = 32,
+        true_params: Dict[str, Union[np.ndarray, float]] = None,
+    ) -> None:
         super().__init__()
         self.model = model
         self.lr = lr
@@ -20,6 +24,7 @@ class PlugInEstimator(pl.LightningModule):
             covariate_samples) if covariate_samples is not None else None
         self.val_idx_to_name = ["train", "val", "val_poi"]
         self.test_idx_to_name = ["test", "test_poi"]
+        self.true_params = true_params
 
     def forward(self, x: torch.tensor, z: torch.tensor):
         if z is None:
@@ -38,20 +43,12 @@ class PlugInEstimator(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        prefix = self.val_idx_to_name[dataloader_idx]
-        return self._eval_loss_and_metric(
-            batch,
-            f"loss/{prefix}",
-            f"metric/{prefix}",
-        )
+        suffix = self.val_idx_to_name[dataloader_idx]
+        return self._eval_metrics(batch, suffix)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        prefix = self.test_idx_to_name[dataloader_idx]
-        return self._eval_loss_and_metric(
-            batch,
-            f"loss/{prefix}",
-            f"metric/{prefix}",
-        )
+        suffix = self.test_idx_to_name[dataloader_idx]
+        return self._eval_metrics(batch, suffix)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -72,7 +69,7 @@ class PlugInEstimator(pl.LightningModule):
 
     def _sample_covariates(self):
         indices = torch.randint(0, self.covariate_samples.shape[0],
-                                (self.monte_carlo_size,))
+                                (self.monte_carlo_size, ))
         return self.covariate_samples[indices]
 
     def _predict_outcome(self, batch):
@@ -99,13 +96,24 @@ class PlugInEstimator(pl.LightningModule):
             dim=0)  # Average over MC samples.
         return y_hat_causal
 
-    def _eval_loss_and_metric(self, batch, loss_text_label, metric_text_label):
+    def _eval_params_mse(self):
+        if self.true_params is None:
+            raise ValueError("true_params is not provided.")
+        true_params = torch.from_numpy(self.true_params["b"]).squeeze()
+        params = _get_causal_params(self.model, len(true_params))
+        mse = nn.functional.mse_loss(params, true_params)
+        return mse
+
+    def _eval_metrics(self, batch, suffix):
         y_hat_causal = self._estimate_causal_effect(batch)
         y_hat = self._predict_outcome(batch)
         y = batch[1]
         loss = self._loss_fn(y_hat, y)
         metric = self._metric_fn(y_hat_causal, y)
-        metrics = {loss_text_label: loss, metric_text_label: metric}
+        metrics = {f"loss/{suffix}": loss, f"metric/{suffix}": metric}
+        if suffix in ("val", "test") and self.true_params:
+            metrics["params_mse"] = self._eval_params_mse()
+
         for k, v in metrics.items():
             self.log(k,
                      v,
@@ -120,12 +128,7 @@ def model_factory(input_dim: int,
                   graph_prior: np.ndarray,
                   model_type: str = "linear_regression",
                   **kwargs):
-    if model_type == "graph_smooth_linear_regression":
-        return nn.Sequential(
-            GraphSmoothLayer(graph_prior, **kwargs),
-            nn.Linear(input_dim, 1),
-        )
-    elif model_type == "linear_regression":
+    if model_type == "linear_regression":
         return nn.Linear(input_dim, 1, **kwargs)
     elif model_type == "graph_regularized_linear_regression":
         return GraphRegularizedLinearModel(graph_prior, input_dim, **kwargs)
@@ -133,21 +136,6 @@ def model_factory(input_dim: int,
         return nn.Sequential(
             GraphSmoothLayer(graph_prior, **kwargs),
             nn.Linear(input_dim, 1),
-        )
-    elif model_type == "graph_smooth_mlp":
-        hidden_dim = kwargs.pop("hidden_dim", 32)
-        return nn.Sequential(
-            GraphSmoothLayer(graph_prior, **kwargs),
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
-    elif model_type == "mlp":
-        hidden_dim = kwargs.get("hidden_dim", 32)
-        return nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
         )
 
 
@@ -199,7 +187,8 @@ class GraphRegularizedLinearModel(nn.Module):
         graph_prior = torch.from_numpy(graph_prior)
         self.graph_prior = graph_prior
         self.linear = nn.Linear(input_dim, 1)
-        self.laplacian = torch.diag(torch.sum(graph_prior, dim=1)) - graph_prior
+        self.laplacian = torch.diag(torch.sum(graph_prior,
+                                              dim=1)) - graph_prior
         self.laplacian = self.laplacian.to(self.linear.weight.dtype)
 
     def forward(self, h):
@@ -212,3 +201,14 @@ class GraphRegularizedLinearModel(nn.Module):
         loss = params @ self.laplacian @ params.T
         loss = loss.squeeze()
         return self.alpha * loss
+
+
+def _get_causal_params(model: nn.Module, num_params: int):
+    linear = None
+    if isinstance(model, GraphRegularizedLinearModel):
+        linear = model.linear
+    elif isinstance(model, nn.Linear):
+        linear = model
+    elif isinstance(model, nn.Sequential):  # SGC
+        linear = model[-1]
+    return linear.weight[:num_params, :]

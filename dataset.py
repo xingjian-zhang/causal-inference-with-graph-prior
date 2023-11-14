@@ -1,3 +1,4 @@
+from typing import Dict, Any
 import pandas as pd
 import numpy as np
 import torch
@@ -17,6 +18,7 @@ class ObservationalDataWithGPrior:
         z: The multi-dimensional covariates.
         poi: Population of interest.
         graph_prior: The graph prior adjacent matrix.
+        parameters: The parameters used to generate the data, if synthetic.
     """
 
     x: np.ndarray
@@ -24,11 +26,11 @@ class ObservationalDataWithGPrior:
     z: np.ndarray
     poi: np.ndarray
     graph_prior: np.ndarray
+    parameters: dict = dataclasses.field(default_factory=dict)
 
 
-def synthetic_data_generation(
-        orignal_filename: str = "data/clean_data.json",
-        output_filename: str = "data/synthetic_data.json",
+def get_synthetic_dataset_with_gprior(
+        original_filename: str = "data/clean_data.json",
         num_cast=900,
         threshold_large_half=0.05,
         threshold_small_half=0.01,
@@ -37,11 +39,40 @@ def synthetic_data_generation(
         counterfactual=False,
         b=None,
         g=None,
-        C=None):
-    assert (counterfactual is not False and b is not None and g is not None
-            and C is not None) or (counterfactual is False)
-    np.random.seed(42)
-    df = pd.read_json(orignal_filename)
+        C=None,
+        random_seed=None,
+        poi: str = "genres",
+        covariates: list = None,
+        strategy: str = "gaussian_kernel",
+        strategy_kwargs: Dict[str, Any] = None) -> ObservationalDataWithGPrior:
+    """
+    Generate a synthetic dataset with a Gaussian prior and save it to a JSON file.
+
+    Parameters:
+    original_filename (str): Path to the original data file.
+    num_cast (int): Number of cast members.
+    threshold_large_half (float): Probability threshold for the larger half.
+    threshold_small_half (float): Probability threshold for the smaller half.
+    target_movie_set (set): Set of target movies.
+    noise_sigma (float): Standard deviation of the noise.
+    counterfactual (bool): Whether to generate counterfactual data.
+    b, g, C: Coefficients for the synthetic data generation.
+    random_seed (int, optional): Random seed for reproducibility.
+    poi (str): Point of interest in the dataset.
+    covariates (list): List of covariates to consider.
+    strategy (str): Strategy for generating the graph prior.
+
+    Returns:
+    ObservationalDataWithGPrior: The generated synthetic dataset.
+    """
+    # Set random seed if provided
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
+    assert (counterfactual and b is not None and g is not None
+            and C is not None) or (not counterfactual)
+    df = pd.read_json(original_filename)
+    target_movie_set = set(target_movie_set)
     G = df['genres'].apply(lambda x: int(bool(set(x) & target_movie_set)))
     G_one_hot = pd.get_dummies(G, prefix='G').values
 
@@ -89,32 +120,7 @@ def synthetic_data_generation(
         lambda x: [i for i, val in enumerate(x) if val == 1])
     syn_data['revenue'] = new_data['Y']
 
-    # save data
-    syn_data.to_json(output_filename)
-    np.savetxt("data/b_coefficient.dat", b)
-    np.savetxt("data/g_coefficient.dat", g)
-    np.savetxt("data/c_coefficient.dat", C)
-
-    return syn_data, (b, g, C)
-
-
-def get_synthetic_dataset_with_gprior(
-    filename: str = "data/synthetic_data.json",
-    poi: str = "genres",
-    covariates: list = None,
-    strategy: str = "gaussian_kernel",
-    counterfactual=False,
-    b=None,
-    g=None,
-    C=None,
-    **kwargs,
-) -> ObservationalDataWithGPrior:
-
-    df, (b, g, C) = synthetic_data_generation(output_filename=filename,
-                                              counterfactual=counterfactual,
-                                              b=b,
-                                              g=g,
-                                              C=C)
+    df = syn_data
     n_cast = df["cast"].apply(max).max() + 1
 
     def index_to_one_hot(index: list):
@@ -134,11 +140,12 @@ def get_synthetic_dataset_with_gprior(
     else:
         raise NotImplementedError(f"POI {poi} not implemented.")
 
-    kwargs['b'] = b
-    graph_prior = get_graph_prior(df, strategy, **kwargs)
+    strategy_kwargs['b'] = b
+    graph_prior = get_graph_prior(df, strategy, **strategy_kwargs)
     x, y, z = _to_dtype(x, y, z, dtype=np.float32)
+    params = {"b": b, "g": g, "C": C}
 
-    return ObservationalDataWithGPrior(x, y, z, poi, graph_prior)
+    return ObservationalDataWithGPrior(x, y, z, poi, graph_prior, params)
 
 
 def get_obs_dataset_with_gprior(
@@ -146,7 +153,7 @@ def get_obs_dataset_with_gprior(
     poi: str = "genres",
     covariates: list = None,
     strategy: str = "genre_similarity",
-    **kwargs,
+    strategy_kwargs: Dict[str, Any] = None,
 ) -> ObservationalDataWithGPrior:
     """Get the tabular dataset for TMDB5000.
 
@@ -184,7 +191,7 @@ def get_obs_dataset_with_gprior(
     else:
         raise NotImplementedError(f"POI {poi} not implemented.")
 
-    graph_prior = get_graph_prior(df, strategy, **kwargs)
+    graph_prior = get_graph_prior(df, strategy, **strategy_kwargs)
     x, y, z = _to_dtype(x, y, z, dtype=np.float32)
 
     return ObservationalDataWithGPrior(x, y, z, poi, graph_prior)

@@ -1,5 +1,6 @@
 PYTHON := /Users/jimmy/miniforge3/envs/gli/bin/python
-CONFIG_DIR := configs
+DATA_CONFIG_DIR := configs/data
+MODELS_CONFIG_DIR := configs/models
 
 .PHONY: lr gr_lr sgc collect-results
 
@@ -16,8 +17,9 @@ clean-all:
 	rm -rf tb_logs
 
 lr gr_lr sgc:
-	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/no_ctrl.yaml --random_seed $(RANDOM_SEED)
-	$(PYTHON) train.py $(CONFIG_DIR)/$@.yaml $(CONFIG_DIR)/cov_ctrl.yaml --random_seed $(RANDOM_SEED)
+	echo "Running $@..."
+	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/tmdb5000_no_ctrl.yaml --random_seed $(RANDOM_SEED)
+	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/tmdb5000_ctrl.yaml --random_seed $(RANDOM_SEED)
 
 all: lr gr_lr sgc
 

@@ -3,6 +3,8 @@ import logging
 import os
 import sys
 from functools import partial
+from typing import Dict, Any
+import warnings
 
 import lightning.pytorch as pl
 import numpy as np
@@ -11,7 +13,8 @@ import yaml
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 
-from dataset import get_dataloader, get_obs_dataset_with_gprior, split_dataset
+from dataset import get_dataloader, get_obs_dataset_with_gprior, \
+    get_synthetic_dataset_with_gprior, split_dataset
 from model import PlugInEstimator, model_factory
 from utils import StreamToLogger
 
@@ -38,9 +41,9 @@ def load_config():
     return model_cfg, train_cfg, dataset_cfg
 
 
-def setup_logging(model_cfg, dataset_cfg):
+def setup_logging(model_cfg: Dict[str, Any], dataset_cfg: Dict[str, Any]):
     cov_str = "_".join(dataset_cfg["covariates"]
-                      ) if dataset_cfg["covariates"] else "no_control"
+                       ) if dataset_cfg["covariates"] else "no_control"
     logger = TensorBoardLogger(
         save_dir="tb_logs/",
         name=model_cfg["type"] + "/" + cov_str,
@@ -58,18 +61,26 @@ def setup_logging(model_cfg, dataset_cfg):
     return logger
 
 
-def train_and_evaluate(model_cfg, train_cfg, dataset_cfg, logger):
-    obs_data = get_obs_dataset_with_gprior(
-        poi=dataset_cfg["poi"],
-        covariates=dataset_cfg["covariates"],
-        strategy=dataset_cfg["strategy"],
-        **dataset_cfg["strategy_kwargs"],
-    )
+def get_data(dataset_cfg: Dict[str, Any]):
+    dataset_name = dataset_cfg.pop("name")
+    if dataset_name == "tmdb5000":
+        return get_obs_dataset_with_gprior(**dataset_cfg)
+    elif dataset_name == "synthetic":
+        return get_synthetic_dataset_with_gprior(**dataset_cfg)
+
+
+def train_and_evaluate(
+    model_cfg: Dict[str, Any],
+    train_cfg: Dict[str, Any],
+    dataset_cfg: Dict[str, Any],
+    logger: TensorBoardLogger,
+):
+    dl_kwargs = dataset_cfg.pop("dataloader_kwargs")
+    obs_data = get_data(dataset_cfg)
     train_data, val_data, test_data = split_dataset(
         obs_data,
         **train_cfg["split_kwargs"],
     )
-    dl_kwargs = dataset_cfg["dataloader_kwargs"]
 
     loader = partial(get_dataloader, **dl_kwargs)
     train_loader = loader(train_data, shuffle=True)
@@ -118,13 +129,20 @@ def train_and_evaluate(model_cfg, train_cfg, dataset_cfg, logger):
     return test_output
 
 
-def save_results(model_cfg, train_cfg, dataset_cfg, test_output, logger):
+def save_results(
+    model_cfg: Dict[str, Any],
+    train_cfg: Dict[str, Any],
+    dataset_cfg: Dict[str, Any],
+    test_output: Any,
+    logger: TensorBoardLogger,
+):
     metric = {k: v for d in test_output for k, v in d.items()}
     config = {"model": model_cfg, "dataset": dataset_cfg, "train": train_cfg}
     logger.log_hyperparams(config, metric)
 
 
 def main():
+    warnings.filterwarnings("ignore", ".*does not have many workers.*")
     model_cfg, train_cfg, dataset_cfg = load_config()
     logger = setup_logging(model_cfg, dataset_cfg)
     test_output = train_and_evaluate(model_cfg, train_cfg, dataset_cfg, logger)

@@ -1,6 +1,7 @@
 dataset:
+  name: "tmdb5000"
   poi: "genres"
-  covariates: []
+  covariates: ["budget", "runtime"]
   strategy: "genre_similarity"
   strategy_kwargs:
     threshold: 0.8
