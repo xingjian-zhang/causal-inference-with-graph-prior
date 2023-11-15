@@ -42,29 +42,9 @@ def get_synthetic_dataset_with_gprior(
         C=None,
         random_seed=None,
         poi: str = "genres",
-        covariates: list = None,
+        covariates: bool = True,
         strategy: str = "gaussian_kernel",
         strategy_kwargs: Dict[str, Any] = None) -> ObservationalDataWithGPrior:
-    """
-    Generate a synthetic dataset with a Gaussian prior and save it to a JSON file.
-
-    Parameters:
-    original_filename (str): Path to the original data file.
-    num_cast (int): Number of cast members.
-    threshold_large_half (float): Probability threshold for the larger half.
-    threshold_small_half (float): Probability threshold for the smaller half.
-    target_movie_set (set): Set of target movies.
-    noise_sigma (float): Standard deviation of the noise.
-    counterfactual (bool): Whether to generate counterfactual data.
-    b, g, C: Coefficients for the synthetic data generation.
-    random_seed (int, optional): Random seed for reproducibility.
-    poi (str): Point of interest in the dataset.
-    covariates (list): List of covariates to consider.
-    strategy (str): Strategy for generating the graph prior.
-
-    Returns:
-    ObservationalDataWithGPrior: The generated synthetic dataset.
-    """
     # Set random seed if provided
     if random_seed is not None:
         np.random.seed(random_seed)
@@ -131,8 +111,7 @@ def get_synthetic_dataset_with_gprior(
     df["X"] = df["cast"].apply(index_to_one_hot)
     x = np.stack(df["X"].values)
     y = df["revenue"].values
-    z = _get_covariates(df, covariates)
-    z = _standardize(z)
+    z = G_one_hot if covariates else None
 
     if poi == "genres":
         poi = df['genres'].apply(lambda x: x[0] == 0)
@@ -324,31 +303,26 @@ def _split_arrays(
 
 def _get_gaussian_kernel_prior(
     df: pd.DataFrame,
-    threshold: float = 0.8,
+    b: np.ndarray = None,
+    threshold: float = 0.99,
     binary: bool = True,
-    **kwargs,
+    sigma: bool = None,
 ):
-    b = kwargs.get('b')
     n_cast = df["cast"].apply(max).max() + 1
     assert len(b) == n_cast
-    actor_similarity_matrix = np.zeros((n_cast, n_cast), dtype=float)
-    bi = np.tile(b, (n_cast, 1))
-    bj = bi.T
-    actor_similarity_matrix = np.exp(-((bi - bj)**2))  # sigma = 1
+    actor_similarity_matrix = np.exp(-(b - b.T)**2 / sigma**2)
 
-    # when memory not enough:
-    # Define the Gaussian kernel function
-    # def gaussian_kernel(u, v, sigma=1):
-    #     return np.exp(-((u - v) ** 2) / sigma ** 2)
-    # for i in range(n_cast):
-    #     for j in range(i,n_cast):
-    #         actor_similarity_matrix[i, j] = gaussian_kernel(b[i], b[j]).item()
-    #         actor_similarity_matrix[j, i] = actor_similarity_matrix[i,j]
     if binary:
-        return np.where(actor_similarity_matrix > threshold, 1, 0)
+        graph_prior = np.where(actor_similarity_matrix > threshold, 1, 0)
     else:
-        return np.where(actor_similarity_matrix > threshold,
-                        actor_similarity_matrix, 0)
+        graph_prior = np.where(actor_similarity_matrix > threshold,
+                               actor_similarity_matrix, 0)
+
+    if binary:
+        sparsity = np.count_nonzero(graph_prior) / graph_prior.size
+        logging.info("Sparsity of graph_prior matrix %f", sparsity)
+
+    return graph_prior
 
 
 def _get_genre_similarity_prior(

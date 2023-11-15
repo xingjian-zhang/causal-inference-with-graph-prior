@@ -1,8 +1,10 @@
 PYTHON := /Users/jimmy/miniforge3/envs/gli/bin/python
 DATA_CONFIG_DIR := configs/data
 MODELS_CONFIG_DIR := configs/models
+RANDOM_SEED ?= 42
+DATASET_CONFIG ?= tmdb5000_no_ctrl.yaml
 
-.PHONY: lr gr_lr sgc collect-results
+.PHONY: lr gr_lr sgc collect-results clean clean-all all results tensorboard install
 
 clean:
 	rm -rf lightning_logs
@@ -17,9 +19,8 @@ clean-all:
 	rm -rf tb_logs
 
 lr gr_lr sgc:
-	echo "Running $@..."
-	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/tmdb5000_no_ctrl.yaml --random_seed $(RANDOM_SEED)
-	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/tmdb5000_ctrl.yaml --random_seed $(RANDOM_SEED)
+	@echo "\n>>>Running $@<<<\n"
+	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/$(DATASET_CONFIG) --random_seed $(RANDOM_SEED)
 
 all: lr gr_lr sgc
 

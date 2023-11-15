@@ -1,4 +1,4 @@
 type: "simple_graph_convolution"
 model_kwargs:
   n_steps: 1
-  lazy_rate: 0
+  lazy_rate: 0.8

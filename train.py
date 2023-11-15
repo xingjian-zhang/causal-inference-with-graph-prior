@@ -46,7 +46,7 @@ def setup_logging(model_cfg: Dict[str, Any], dataset_cfg: Dict[str, Any]):
                        ) if dataset_cfg["covariates"] else "no_control"
     logger = TensorBoardLogger(
         save_dir="tb_logs/",
-        name=model_cfg["type"] + "/" + cov_str,
+        name=f"{dataset_cfg['name']}/{model_cfg['type']}/{cov_str}"
     )
     os.makedirs(logger.log_dir)
     logging.basicConfig(

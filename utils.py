@@ -40,7 +40,7 @@ def load_data(log_dir="tb_logs"):
     return pd.DataFrame(data)
 
 
-def collect_results():  # TODO - bug in mean and std
+def collect_results():
     df = load_data()
     df_filtered = df[df["tag"].str.contains("test")]
 
@@ -62,7 +62,7 @@ def collect_results():  # TODO - bug in mean and std
     model_map = {
         "graph_regularized_linear_regression": "LR-GR",
         "linear_regression": "LR",
-        "mlp": "MLP"
+        "simple_graph_convolution": "SGC"
     }
     experiment_map = {"no_control": "w/o control", "budget_runtime": "w/control"}
     df_pivot_mean.index = df_pivot_mean.index.map(lambda x:
