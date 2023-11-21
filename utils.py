@@ -5,7 +5,7 @@ import seaborn as sns
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 import numpy as np
 
-def load_data(log_dir="tb_logs"):
+def load_data(log_dir="tb_logs/synthetic/"):
     results = {}
 
     for root, dirs, _ in os.walk(log_dir):

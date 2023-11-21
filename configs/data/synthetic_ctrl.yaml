@@ -7,7 +7,7 @@ dataset:
   noise_sigma: 1
   counterfactual: false
   b: null
-  g: null
+  g: 10
   C: null
   random_seed: null
   poi: "genres"
@@ -22,13 +22,13 @@ dataset:
     num_workers: 0
 
 train:
-  lr: 0.002
+  lr: 0.01
   monte_carlo_size: 64
   split_kwargs:
     train_ratio: 0.7
     val_ratio: 0.15
     test_ratio: 0.15
   trainer_kwargs:
-    max_epochs: 200
+    max_epochs: 500
     check_val_every_n_epoch: 2
     log_every_n_steps: 1

@@ -54,12 +54,12 @@ def get_synthetic_dataset_with_gprior(
     df = pd.read_json(original_filename)
     target_movie_set = set(target_movie_set)
     G = df['genres'].apply(lambda x: int(bool(set(x) & target_movie_set)))
-    G_one_hot = pd.get_dummies(G, prefix='G').values
+    G = G.values
 
     if b is None:
         b = np.random.rand(num_cast, 1)
     if g is None:
-        g = np.random.rand(2, 1)
+        g = np.random.rand(1)
     if C is None:
         C = np.random.rand(1)
 
@@ -85,19 +85,18 @@ def get_synthetic_dataset_with_gprior(
                 p=[1 - threshold_large_half, threshold_large_half])
         A.append(list(first_half) + list(second_half))
 
-    Y = np.dot(A, b) + np.dot(G_one_hot, g) + C
+    Y = np.dot(A, b) + g * G[:, None] + C
     Y = Y + np.random.normal(loc=0, scale=noise_sigma, size=(len(Y), 1))
 
     new_data = pd.DataFrame({
         'A': A,
-        'G': G_one_hot.tolist(),
+        'G': G,
         'Y': Y.flatten()
     })
     syn_data = df.drop(columns=['revenue', 'cast', 'genres'])
     syn_data['cast'] = new_data['A'].apply(
         lambda x: [i for i, val in enumerate(x) if val == 1])
-    syn_data['genres'] = new_data['G'].apply(
-        lambda x: [i for i, val in enumerate(x) if val == 1])
+    syn_data['genres'] = new_data['G']
     syn_data['revenue'] = new_data['Y']
 
     df = syn_data
@@ -111,10 +110,10 @@ def get_synthetic_dataset_with_gprior(
     df["X"] = df["cast"].apply(index_to_one_hot)
     x = np.stack(df["X"].values)
     y = df["revenue"].values
-    z = G_one_hot if covariates else None
+    z = G[:, None] if covariates else None
 
     if poi == "genres":
-        poi = df['genres'].apply(lambda x: x[0] == 0)
+        poi = df['genres'].apply(lambda x: x == 0)
         poi = poi.values
     else:
         raise NotImplementedError(f"POI {poi} not implemented.")

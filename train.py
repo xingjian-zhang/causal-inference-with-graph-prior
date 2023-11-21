@@ -38,15 +38,19 @@ def load_config():
     model_cfg = load_yaml_cfg(args.model_cfg)
     train_cfg = data_cfg["train"]
     dataset_cfg = data_cfg["dataset"]
-    return model_cfg, train_cfg, dataset_cfg
+    return model_cfg, train_cfg, dataset_cfg, args.random_seed
 
 
-def setup_logging(model_cfg: Dict[str, Any], dataset_cfg: Dict[str, Any]):
-    cov_str = "_".join(dataset_cfg["covariates"]
-                       ) if dataset_cfg["covariates"] else "no_control"
+def setup_logging(
+    model_cfg: Dict[str, Any],
+    dataset_cfg: Dict[str, Any],
+    random_seed: int,
+):
+    cov_str = "ctrl" if dataset_cfg["covariates"] else "no_ctrl"
     logger = TensorBoardLogger(
         save_dir="tb_logs/",
-        name=f"{dataset_cfg['name']}/{model_cfg['type']}/{cov_str}"
+        name=f"{dataset_cfg['name']}/{model_cfg['type']}/{cov_str}",
+        version=random_seed,
     )
     os.makedirs(logger.log_dir)
     logging.basicConfig(
@@ -106,6 +110,7 @@ def train_and_evaluate(
         covariate_samples=obs_data.z,  # REVIEW: should we use train_data.z?
         lr=train_cfg["lr"],
         monte_carlo_size=train_cfg["monte_carlo_size"],
+        true_params=obs_data.parameters,
     )
 
     trainer = pl.Trainer(**train_cfg["trainer_kwargs"],
@@ -113,6 +118,7 @@ def train_and_evaluate(
                          enable_progress_bar=False,
                          callbacks=[
                              EarlyStopping(monitor="metric/val",
+                                           min_delta=1e-2,
                                            mode="min",
                                            patience=5)
                          ])
@@ -143,8 +149,8 @@ def save_results(
 
 def main():
     warnings.filterwarnings("ignore", ".*does not have many workers.*")
-    model_cfg, train_cfg, dataset_cfg = load_config()
-    logger = setup_logging(model_cfg, dataset_cfg)
+    model_cfg, train_cfg, dataset_cfg, seed = load_config()
+    logger = setup_logging(model_cfg, dataset_cfg, seed)
     test_output = train_and_evaluate(model_cfg, train_cfg, dataset_cfg, logger)
     save_results(model_cfg, train_cfg, dataset_cfg, test_output, logger)
 

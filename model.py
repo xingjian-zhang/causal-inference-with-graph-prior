@@ -51,7 +51,7 @@ class PlugInEstimator(pl.LightningModule):
         return self._eval_metrics(batch, suffix)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
 
     def _loss_fn(self, y_hat: torch.tensor, y: torch.tensor):
         return nn.functional.mse_loss(y_hat.squeeze(), y.squeeze())
@@ -100,7 +100,8 @@ class PlugInEstimator(pl.LightningModule):
         if self.true_params is None:
             raise ValueError("true_params is not provided.")
         true_params = torch.from_numpy(self.true_params["b"]).squeeze()
-        params = _get_causal_params(self.model, len(true_params))
+        params = _get_causal_params(self.model, len(true_params)).squeeze()
+        true_params = true_params.to(params.device, params.dtype)
         mse = nn.functional.mse_loss(params, true_params)
         return mse
 
@@ -112,7 +113,7 @@ class PlugInEstimator(pl.LightningModule):
         metric = self._metric_fn(y_hat_causal, y)
         metrics = {f"loss/{suffix}": loss, f"metric/{suffix}": metric}
         if suffix in ("val", "test") and self.true_params:
-            metrics["params_mse"] = self._eval_params_mse()
+            metrics[f"params_mse/{suffix}"] = self._eval_params_mse()
 
         for k, v in metrics.items():
             self.log(k,
@@ -161,6 +162,8 @@ class GraphSmoothLayer(nn.Module):
         return torch.matrix_power(diffusion_matrix, self.n_steps)
 
     def forward(self, h):
+        if self.diffusion_matrix.dtype != h.dtype:
+            self.diffusion_matrix = self.diffusion_matrix.to(h.dtype)
         if self.diffusion_matrix.device != h.device:
             self.diffusion_matrix = self.diffusion_matrix.to(h.device)
         x = h[..., :self.adj_matrix.shape[0]]
@@ -211,4 +214,4 @@ def _get_causal_params(model: nn.Module, num_params: int):
         linear = model
     elif isinstance(model, nn.Sequential):  # SGC
         linear = model[-1]
-    return linear.weight[:num_params, :]
+    return linear.weight.squeeze()[:num_params]
