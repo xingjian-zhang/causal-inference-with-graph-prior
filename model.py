@@ -51,7 +51,9 @@ class PlugInEstimator(pl.LightningModule):
         return self._eval_metrics(batch, suffix)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        return torch.optim.Adam(self.parameters(),
+                                lr=self.lr,
+                                weight_decay=1e-4)
 
     def _loss_fn(self, y_hat: torch.tensor, y: torch.tensor):
         return nn.functional.mse_loss(y_hat.squeeze(), y.squeeze())
@@ -99,9 +101,15 @@ class PlugInEstimator(pl.LightningModule):
     def _eval_params_mse(self):
         if self.true_params is None:
             raise ValueError("true_params is not provided.")
+
         true_params = torch.from_numpy(self.true_params["b"]).squeeze()
         params = _get_causal_params(self.model, len(true_params)).squeeze()
-        true_params = true_params.to(params.device, params.dtype)
+        true_params = true_params.to(device=params.device, dtype=params.dtype)
+
+        standardize = lambda x: (x - x.mean()) / x.std()
+        true_params = standardize(true_params)
+        params = standardize(params)
+
         mse = nn.functional.mse_loss(params, true_params)
         return mse
 
@@ -142,7 +150,7 @@ def model_factory(input_dim: int,
 
 class GraphSmoothLayer(nn.Module):
 
-    def __init__(self, adj_matrix, n_steps=1, lazy_rate=0.):
+    def __init__(self, adj_matrix, n_steps=1, lazy_rate=0.5):
         super().__init__()
         if not isinstance(adj_matrix, torch.Tensor):
             adj_matrix = torch.from_numpy(adj_matrix)
@@ -153,13 +161,22 @@ class GraphSmoothLayer(nn.Module):
         self.diffusion_matrix = self._get_diffusion_matrix()
 
     def _get_diffusion_matrix(self):
-        if self.n_steps == 0:
-            return torch.eye(self.adj_matrix.shape[0])
+        # Calculate row sums (degree of each vertex)
+        deg = self.adj_matrix.sum(dim=1, keepdim=True)
+        # Normalize adjacency matrix to get the transition matrix
+        transition_matrix = self.adj_matrix / deg
 
-        graph_laplacian = _compute_normalized_laplacian(self.adj_matrix)
-        diffusion_matrix = self.lazy_rate * torch.eye(
-            self.adj_matrix.shape[0]) + (1 - self.lazy_rate) * graph_laplacian
-        return torch.matrix_power(diffusion_matrix, self.n_steps)
+        # Incorporate lazy rate
+        identity = torch.eye(self.adj_matrix.size(0),
+                             dtype=self.adj_matrix.dtype)
+        diffusion_matrix = self.lazy_rate * identity + (
+            1 - self.lazy_rate) * transition_matrix
+
+        # If n_steps > 1, raise the matrix to the power of n_steps
+        if self.n_steps > 1:
+            diffusion_matrix = diffusion_matrix.matrix_power(self.n_steps)
+
+        return diffusion_matrix
 
     def forward(self, h):
         if self.diffusion_matrix.dtype != h.dtype:

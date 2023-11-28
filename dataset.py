@@ -62,6 +62,8 @@ def get_synthetic_dataset_with_gprior(
         g = np.random.rand(1)
     if C is None:
         C = np.random.rand(1)
+    if strategy_kwargs is None:
+        strategy_kwargs = {}
 
     A = []
     for g_val in G:
@@ -100,6 +102,7 @@ def get_synthetic_dataset_with_gprior(
     syn_data['revenue'] = new_data['Y']
 
     df = syn_data
+    df = df[df['cast'].apply(lambda x: len(x) > 0)]
     n_cast = df["cast"].apply(max).max() + 1
 
     def index_to_one_hot(index: list):
@@ -110,7 +113,7 @@ def get_synthetic_dataset_with_gprior(
     df["X"] = df["cast"].apply(index_to_one_hot)
     x = np.stack(df["X"].values)
     y = df["revenue"].values
-    z = G[:, None] if covariates else None
+    z = df["genres"].values[:, None] if covariates else None
 
     if poi == "genres":
         poi = df['genres'].apply(lambda x: x == 0)

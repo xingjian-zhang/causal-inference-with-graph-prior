@@ -73,6 +73,13 @@ def get_data(dataset_cfg: Dict[str, Any]):
         return get_synthetic_dataset_with_gprior(**dataset_cfg)
 
 
+def log_graph_prior(graph_prior: np.ndarray):
+    num_nodes = graph_prior.shape[0]
+    num_edges = np.count_nonzero(graph_prior)
+    logging.info(f"Graph prior: {num_nodes} nodes, {num_edges} edges.")
+    logging.info(f"Graph prior sparsity: {num_edges / num_nodes**2}")
+
+
 def train_and_evaluate(
     model_cfg: Dict[str, Any],
     train_cfg: Dict[str, Any],
@@ -98,6 +105,7 @@ def train_and_evaluate(
     if obs_data.z is not None:
         input_dim += obs_data.z.shape[1]
 
+    log_graph_prior(obs_data.graph_prior)
     model = model_factory(
         input_dim,
         obs_data.graph_prior,
@@ -117,8 +125,7 @@ def train_and_evaluate(
                          logger=logger,
                          enable_progress_bar=False,
                          callbacks=[
-                             EarlyStopping(monitor="metric/val",
-                                           min_delta=1e-2,
+                             EarlyStopping(monitor="loss/val",
                                            mode="min",
                                            patience=5)
                          ])
