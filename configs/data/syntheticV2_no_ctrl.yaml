@@ -11,6 +11,7 @@ dataset:
     threshold: 0.999
     sigma: 0.1
     binary: False
+    b_noise_sigma: 0.
   dataloader_kwargs:
     batch_size: 4096
     num_workers: 0

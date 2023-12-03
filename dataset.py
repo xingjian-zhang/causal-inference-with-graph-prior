@@ -369,8 +369,11 @@ def _get_gaussian_kernel_prior(
     threshold: float = 0.99,
     binary: bool = True,
     sigma: bool = None,
+    b_noise_sigma: float = 0.,
 ):
     b = np.reshape(b, (-1, 1))
+    b_noise = np.random.normal(loc=0, scale=b_noise_sigma, size=b.shape)
+    b += b_noise
     actor_similarity_matrix = np.exp(-(b - b.T)**2 / sigma**2)
 
     if binary:
