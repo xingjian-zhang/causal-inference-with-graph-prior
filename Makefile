@@ -8,6 +8,8 @@ DATASET_CONFIG ?= tmdb5000_no_ctrl.yaml
 REMOTE_SYNC_PATH ?= jimmyzxj@greatlakes-xfer.arc-ts.umich.edu:/home/jimmyzxj/Research/causal_graph_prior
 REMOTE_PROJECT_PATH ?= /home/jimmyzxj/Research/causal_graph_prior
 REMOTE_SERVER ?= greatlakes
+EXPERIMENT_NAME ?= ""
+OVERRIDE_CFG ?= ""
 
 .PHONY: lr gr_lr sgc collect-results clean clean-all all results tensorboard install sync-remote sync-local run-remote-synthetic clean-all-remote
 
@@ -28,7 +30,7 @@ clean-all-remote:
 
 lr gr_lr sgc:
 	@echo "\n>>>Running $@<<<\n"
-	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/$(DATASET_CONFIG) --random_seed $(RANDOM_SEED)
+	$(PYTHON) train.py $(MODELS_CONFIG_DIR)/$@.yaml $(DATA_CONFIG_DIR)/$(DATASET_CONFIG) --random_seed $(RANDOM_SEED) --override_cfg $(OVERRIDE_CFG) --experiment_name $(EXPERIMENT_NAME)
 
 all: lr gr_lr sgc
 

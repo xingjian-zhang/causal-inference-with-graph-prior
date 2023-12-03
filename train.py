@@ -22,6 +22,8 @@ from utils import StreamToLogger
 
 
 def override_config(model_cfg: Dict, data_cfg: Dict, override_cfg: str):
+    if not override_cfg:
+        return model_cfg, data_cfg
     override_cfgs = override_cfg.split(",")
     for override_cfg in override_cfgs:
         key, value = override_cfg.split("=")
@@ -74,7 +76,7 @@ def setup_logging(
     experiment_name: str = None,
 ):
     cov_str = "ctrl" if dataset_cfg["covariates"] else "no_ctrl"
-    if experiment_name is None:
+    if not experiment_name:
         experiment_name = "base"
     logger = TensorBoardLogger(
         save_dir="tb_logs/",
@@ -109,7 +111,7 @@ def log_graph_prior(graph_prior: np.ndarray):
     num_nodes = graph_prior.shape[0]
     num_edges = np.count_nonzero(graph_prior)
     logging.info(f"Graph prior: {num_nodes} nodes, {num_edges} edges.")
-    logging.info(f"Graph prior sparsity: {num_edges / num_nodes**2}")
+    logging.info(f"Avg. degree: {num_edges / num_nodes}")
 
 
 def train_and_evaluate(
