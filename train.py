@@ -21,10 +21,30 @@ from model import PlugInEstimator, model_factory
 from utils import StreamToLogger
 
 
+def override_config(model_cfg: Dict, data_cfg: Dict, override_cfg: str):
+    override_cfgs = override_cfg.split(",")
+    for override_cfg in override_cfgs:
+        key, value = override_cfg.split("=")
+        keys = key.split(".")
+        which_cfg = keys[0]
+        if which_cfg == "model":
+            cfg = model_cfg
+        elif which_cfg == "data":
+            cfg = data_cfg
+        else:
+            raise ValueError(f"Unknown config: {which_cfg}")
+        for k in keys[1:-1]:
+            cfg = cfg[k]
+        cfg[keys[-1]] = type(cfg[keys[-1]])(value)
+    print(model_cfg, data_cfg)
+    return model_cfg, data_cfg
+
+
 def load_config():
     parser = argparse.ArgumentParser()
     parser.add_argument("model_cfg", type=str)
     parser.add_argument("data_cfg", type=str)
+    parser.add_argument("--override_cfg", type=str, default=None)
     parser.add_argument("--random_seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -38,6 +58,9 @@ def load_config():
 
     data_cfg = load_yaml_cfg(args.data_cfg)
     model_cfg = load_yaml_cfg(args.model_cfg)
+    if args.override_cfg is not None:
+        model_cfg, data_cfg = override_config(model_cfg, data_cfg,
+                                              args.override_cfg)
     train_cfg = data_cfg["train"]
     dataset_cfg = data_cfg["dataset"]
     return model_cfg, train_cfg, dataset_cfg, args.random_seed
