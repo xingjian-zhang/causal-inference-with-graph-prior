@@ -1,0 +1,27 @@
+dataset:
+  name: "syntheticV2"
+  num_cast: 1000
+  expected_num_cast_per_movie: 10
+  confounder_effect: 2
+  strategy: "gaussian_kernel"
+  covariates: False
+  sigma_noise: 0.5
+  strategy_kwargs:
+    threshold: 0.999
+    sigma: 0.1
+    binary: False
+  dataloader_kwargs:
+    batch_size: 4096
+    num_workers: 0
+
+train:
+  lr: 0.01
+  monte_carlo_size: 64
+  split_kwargs:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+  trainer_kwargs:
+    max_epochs: 2000
+    check_val_every_n_epoch: 2
+    log_every_n_steps: 1

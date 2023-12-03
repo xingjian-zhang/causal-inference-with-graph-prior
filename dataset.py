@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 import dataclasses
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from torch.utils.data import TensorDataset, DataLoader
@@ -27,6 +27,60 @@ class ObservationalDataWithGPrior:
     poi: np.ndarray
     graph_prior: np.ndarray
     parameters: dict = dataclasses.field(default_factory=dict)
+
+
+def get_synthetic_dataset_with_gpriorV2(
+        original_filename: str = "data/clean_data.json",
+        num_cast=900,
+        expected_num_cast_per_movie=10,
+        confounder_effect=2,
+        sigma_noise=1,
+        random_seed=None,
+        covariates: bool = True,
+        strategy: str = "gaussian_kernel",
+        strategy_kwargs: Dict[str, Any] = None) -> ObservationalDataWithGPrior:
+    # Set random seed if provided
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
+    # Load data.
+    df = pd.read_json(original_filename)
+    mlb = MultiLabelBinarizer()
+    genres = mlb.fit_transform(df['genres'])
+    num_genres = genres.shape[1]
+
+    # Generate cast.
+    preference_matrix = np.random.normal(size=(num_genres, num_cast))
+    logits = genres @ preference_matrix
+    likelihood = np.exp(logits) / np.sum(np.exp(logits), axis=1)[:, None]
+    likelihood *= expected_num_cast_per_movie
+    likelihood = np.clip(likelihood, 0, 1)
+    cast = np.random.binomial(1, likelihood)
+
+    # Generate label.
+    cast_coeff = np.random.uniform(low=-1, high=1, size=num_cast)
+    genres_coeff = np.random.uniform(low=-1, high=1,
+                                     size=num_genres) * confounder_effect
+    cast_label = cast @ cast_coeff
+    genres_label = genres @ genres_coeff
+    noise = np.random.normal(loc=0, scale=sigma_noise, size=cast_label.shape)
+    labels = cast_label + genres_label + noise
+
+    # Population of interest.
+    poi = df['genres'].apply(lambda x: int(bool(set(x) & {5, 6, 10}))).values
+
+    # Generate prior graph.
+    strategy_kwargs['b'] = cast_coeff
+    graph_prior = get_graph_prior(df, strategy, **strategy_kwargs)
+
+    # Return the dataset.
+    x, y, z = _to_dtype(cast, labels, genres, dtype=np.float32)
+    if not covariates:
+        z = None
+    return ObservationalDataWithGPrior(x, y, z, poi, graph_prior, {
+        "b": cast_coeff,
+        "g": genres_coeff,
+    })
 
 
 def get_synthetic_dataset_with_gprior(
@@ -310,8 +364,7 @@ def _get_gaussian_kernel_prior(
     binary: bool = True,
     sigma: bool = None,
 ):
-    n_cast = df["cast"].apply(max).max() + 1
-    assert len(b) == n_cast
+    b = np.reshape(b, (-1, 1))
     actor_similarity_matrix = np.exp(-(b - b.T)**2 / sigma**2)
 
     if binary:

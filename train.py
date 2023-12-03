@@ -13,8 +13,10 @@ import yaml
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 
-from dataset import get_dataloader, get_obs_dataset_with_gprior, \
-    get_synthetic_dataset_with_gprior, split_dataset
+from dataset import \
+    get_dataloader, get_obs_dataset_with_gprior, \
+    get_synthetic_dataset_with_gprior, split_dataset, \
+    get_synthetic_dataset_with_gpriorV2
 from model import PlugInEstimator, model_factory
 from utils import StreamToLogger
 
@@ -71,6 +73,8 @@ def get_data(dataset_cfg: Dict[str, Any]):
         return get_obs_dataset_with_gprior(**dataset_cfg)
     elif dataset_name == "synthetic":
         return get_synthetic_dataset_with_gprior(**dataset_cfg)
+    elif dataset_name == "syntheticV2":
+        return get_synthetic_dataset_with_gpriorV2(**dataset_cfg)
 
 
 def log_graph_prior(graph_prior: np.ndarray):

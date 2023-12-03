@@ -106,10 +106,6 @@ class PlugInEstimator(pl.LightningModule):
         params = _get_causal_params(self.model, len(true_params)).squeeze()
         true_params = true_params.to(device=params.device, dtype=params.dtype)
 
-        standardize = lambda x: (x - x.mean()) / x.std()
-        true_params = standardize(true_params)
-        params = standardize(params)
-
         mse = nn.functional.mse_loss(params, true_params)
         return mse
 
