@@ -1,6 +1,7 @@
 dataset:
   name: "syntheticV2"
   num_cast: 1000
+  num_observation: 1000
   expected_num_cast_per_movie: 10
   confounder_effect: 2
   strategy: "gaussian_kernel"

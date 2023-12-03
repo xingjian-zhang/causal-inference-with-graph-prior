@@ -45,6 +45,7 @@ def load_config():
     parser.add_argument("model_cfg", type=str)
     parser.add_argument("data_cfg", type=str)
     parser.add_argument("--override_cfg", type=str, default=None)
+    parser.add_argument("--experiment_name", type=str, default=None)
     parser.add_argument("--random_seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -63,18 +64,22 @@ def load_config():
                                               args.override_cfg)
     train_cfg = data_cfg["train"]
     dataset_cfg = data_cfg["dataset"]
-    return model_cfg, train_cfg, dataset_cfg, args.random_seed
+    return model_cfg, train_cfg, dataset_cfg, args.random_seed, args.experiment_name
 
 
 def setup_logging(
     model_cfg: Dict[str, Any],
     dataset_cfg: Dict[str, Any],
     random_seed: int,
+    experiment_name: str = None,
 ):
     cov_str = "ctrl" if dataset_cfg["covariates"] else "no_ctrl"
+    if experiment_name is None:
+        experiment_name = "base"
     logger = TensorBoardLogger(
         save_dir="tb_logs/",
-        name=f"{dataset_cfg['name']}/{model_cfg['type']}/{cov_str}",
+        name=
+        f"{experiment_name}/{dataset_cfg['name']}/{model_cfg['type']}/{cov_str}",
         version=random_seed,
     )
     os.makedirs(logger.log_dir)
@@ -183,8 +188,8 @@ def save_results(
 
 def main():
     warnings.filterwarnings("ignore", ".*does not have many workers.*")
-    model_cfg, train_cfg, dataset_cfg, seed = load_config()
-    logger = setup_logging(model_cfg, dataset_cfg, seed)
+    model_cfg, train_cfg, dataset_cfg, seed, name = load_config()
+    logger = setup_logging(model_cfg, dataset_cfg, seed, name)
     test_output = train_and_evaluate(model_cfg, train_cfg, dataset_cfg, logger)
     save_results(model_cfg, train_cfg, dataset_cfg, test_output, logger)
 

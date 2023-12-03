@@ -31,11 +31,12 @@ class ObservationalDataWithGPrior:
 
 def get_synthetic_dataset_with_gpriorV2(
         original_filename: str = "data/clean_data.json",
-        num_cast=900,
-        expected_num_cast_per_movie=10,
-        confounder_effect=2,
-        sigma_noise=1,
-        random_seed=None,
+        num_cast: int = 900,
+        num_observation: int = 1000,
+        expected_num_cast_per_movie: int = 10,
+        confounder_effect: float = 2,
+        sigma_noise: float = 1,
+        random_seed: int = None,
         covariates: bool = True,
         strategy: str = "gaussian_kernel",
         strategy_kwargs: Dict[str, Any] = None) -> ObservationalDataWithGPrior:
@@ -48,6 +49,15 @@ def get_synthetic_dataset_with_gpriorV2(
     mlb = MultiLabelBinarizer()
     genres = mlb.fit_transform(df['genres'])
     num_genres = genres.shape[1]
+
+    # Sample observations.
+    num_real_observation = genres.shape[0]
+    # Down sample genres if num_observation is smaller than
+    # num_real_observation. Else up sample genres.
+    idx = np.random.choice(num_real_observation,
+                           size=num_observation,
+                           replace=num_observation >= num_real_observation)
+    genres = genres[idx]
 
     # Generate cast.
     preference_matrix = np.random.normal(size=(num_genres, num_cast))
@@ -144,11 +154,7 @@ def get_synthetic_dataset_with_gprior(
     Y = np.dot(A, b) + g * G[:, None] + C
     Y = Y + np.random.normal(loc=0, scale=noise_sigma, size=(len(Y), 1))
 
-    new_data = pd.DataFrame({
-        'A': A,
-        'G': G,
-        'Y': Y.flatten()
-    })
+    new_data = pd.DataFrame({'A': A, 'G': G, 'Y': Y.flatten()})
     syn_data = df.drop(columns=['revenue', 'cast', 'genres'])
     syn_data['cast'] = new_data['A'].apply(
         lambda x: [i for i, val in enumerate(x) if val == 1])
