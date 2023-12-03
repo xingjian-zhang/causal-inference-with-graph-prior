@@ -13,6 +13,25 @@ OVERRIDE_CFG ?= ""
 
 .PHONY: lr gr_lr sgc collect-results clean clean-all all results tensorboard install sync-remote sync-local run-remote-synthetic clean-all-remote
 
+help:
+	@echo "Please use \`make <target>' where <target> is one of"
+	@echo "  lr             to run the LR model"
+	@echo "  gr_lr          to run the GR-LR model"
+	@echo "  sgc            to run the SGC model"
+	@echo "  all            to run all the models"
+	@echo "  results        to create the results directory"
+	@echo "  collect-results to collect the results"
+	@echo "  clean          to remove the lightning_logs directory"
+	@echo "  clean-all      to remove the lightning_logs and tb_logs directories"
+	@echo "  tensorboard    to run tensorboard"
+	@echo "  install        to install the dependencies"
+	@echo "  sync-remote    to sync the project to the remote server"
+	@echo "  sync-local     to sync the results back to local"
+	@echo "  run-remote-synthetic to run the synthetic experiment on the remote server"
+	@echo "  run-remote-tmdb5000 to run the tmdb5000 experiment on the remote server"
+	@echo "  run-remote     to run all the experiments on the remote server"
+	@echo "  clean-all-remote to clean all the experiments on the remote server"
+
 clean:
 	rm -rf lightning_logs
 	for dir in tb_logs/*/*; do \

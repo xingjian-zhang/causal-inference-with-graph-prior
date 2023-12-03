@@ -9,7 +9,7 @@ if [ -z "$RANDOM_SEED" ]; then
   exit 1
 fi
 
-NUM_OBS=(100 500 1000 2000)
+NUM_OBS=(100 500 2000)
 
 for i in "${NUM_OBS[@]}"; do
   echo "Running experiment with RANDOM_SEED=$RANDOM_SEED and NUM_OBS=$i"
